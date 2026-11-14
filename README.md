@@ -21,10 +21,11 @@ Each directory under `cmd/` is one binary, named after its directory.
 
 ## sctool
 
-Run `sctool`. It starts in NORMAL mode.
+Run `sctool`. It opens on the **top margins** view: the 25 commodities with the biggest profit per SCU, each going from its cheapest in-stock buy to its best sell anywhere, with ROI bars. Press `t` to come back to it at any time.
 
 | Key | Action |
 |---|---|
+| `t` | Top margins (landing page) |
 | `c` | Search a commodity |
 | `l` | Search a location |
 | `/` | Search again in the current mode |

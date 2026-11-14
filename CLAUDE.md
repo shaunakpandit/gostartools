@@ -9,7 +9,8 @@ When a second tool needs the UEX fetch and cache code, move it from `cmd/sctool/
 An interactive TUI for looking up commodity prices.
 
 - `data.go`: fetches from the UEX API, caches to `~/.cache/sctool/current.json`, and archives one snapshot per day to `archive/YYYY-MM-DD.json`. Data is refetched at most once every `staleAfter` (1 minute). `withSystems` joins prices to terminals to fill in `price.System`, because the prices endpoint has no system field.
-- `query.go`: pure functions with no I/O: `fuzzyScore`, the generic `topMatches`, `commodityReport` and `locationReport`. Put new logic here and test it in `query_test.go`.
+- `query.go`: pure functions with no I/O: `fuzzyScore`, the generic `topMatches`, `commodityReport`, `locationReport` and `topRoutes` (the landing view). Put new logic here and test it in `query_test.go`.
+- `view.go`: renders the views as aligned rows (no tables). It only uses ANSI palette colors 0-15 and bold/faint/reverse so it follows the terminal theme. Never use hex colors.
 - `main.go`: the TUI, built with bubbletea, bubbles (`textinput`, `viewport`), lipgloss and `lipgloss/table`. It has vim-style NORMAL and INSERT modes. Searches run as an async `tea.Cmd` that calls `load()`.
 
 ## UEX field meanings

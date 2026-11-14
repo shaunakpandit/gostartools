@@ -60,3 +60,11 @@ func TestLocationReport(t *testing.T) {
 		t.Errorf("iodine should have no sell targets")
 	}
 }
+
+func TestTopRoutes(t *testing.T) {
+	routes := topRoutes(fixture, 5)
+	// Gold: in-stock Beta 90 -> Delta 150; the cheaper Empty terminal has no stock. Iodine has no buyer.
+	if len(routes) != 1 || routes[0].Buy.Terminal != "Beta" || routes[0].Sell.Terminal != "Delta" || routes[0].margin() != 60 {
+		t.Fatalf("routes = %+v", routes)
+	}
+}

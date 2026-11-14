@@ -25,6 +25,7 @@ var (
 const (
 	nameWidth = 22
 	barWidth  = 10
+	topCount  = 25
 	none      = "—"
 )
 
@@ -35,6 +36,9 @@ type column struct {
 
 func render(data snapshot, kind searchKind, query string) string {
 	var sections []string
+	if kind == topView {
+		return renderTop(data.Prices)
+	}
 	if kind == commoditySearch {
 		identity := func(name string) []string { return []string{name} }
 		for _, name := range topMatches(query, commodityNames(data.Prices), identity, 3) {
@@ -110,6 +114,39 @@ func renderLocation(prices []price, t terminal) string {
 		{"commodity", false}, {"aUEC", true}, {"scu", true},
 		{"best in system", false}, {"aUEC", true}, {"margin", true},
 		{"best anywhere", false}, {"aUEC", true}, {"margin", true}, {"", false},
+	}
+	return title + "\n" + layout(columns, rows)
+}
+
+func renderTop(prices []price) string {
+	routes := topRoutes(prices, topCount)
+	title := heading("Top margins", "cheapest in-stock buy → best sell anywhere · aUEC per SCU")
+	if len(routes) == 0 {
+		return title + "\n" + faint.Render("  no profitable routes in the current data")
+	}
+	roi := func(r route) float64 { return r.margin() / r.Buy.Buy * 100 }
+	// Bars use ROI, not margin: one rare high-value commodity would otherwise flatten every other bar.
+	best := 0.0
+	for _, r := range routes {
+		best = max(best, roi(r))
+	}
+	var rows [][]string
+	for _, r := range routes {
+		rows = append(rows, []string{
+			bold.Render(r.Buy.Commodity),
+			place.Render(truncate(r.Buy.Terminal, nameWidth)) + faint.Render(" "+r.Buy.System),
+			cost.Render(money(r.Buy.Buy)),
+			stock(r.Buy.Stock),
+			place.Render(truncate(r.Sell.Terminal, nameWidth)) + faint.Render(" "+r.Sell.System),
+			gain.Render(money(r.Sell.Sell)),
+			signed(r.margin()),
+			faint.Render(fmt.Sprintf("%.0f%%", roi(r))),
+			bar(roi(r), best),
+		})
+	}
+	columns := []column{
+		{"commodity", false}, {"buy at", false}, {"aUEC", true}, {"scu", true},
+		{"sell at", false}, {"aUEC", true}, {"margin", true}, {"roi", true}, {"", false},
 	}
 	return title + "\n" + layout(columns, rows)
 }

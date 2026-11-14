@@ -156,3 +156,21 @@ func locationReport(prices []price, terminalID int) []locationLine {
 	slices.SortFunc(lines, func(a, b locationLine) int { return cmp.Compare(a.Item.Commodity, b.Item.Commodity) })
 	return lines
 }
+
+type route struct{ Buy, Sell price }
+
+func (r route) margin() float64 { return r.Sell.Sell - r.Buy.Buy }
+
+// topRoutes pairs each commodity's cheapest in-stock buy with its best sell anywhere, highest margin first.
+func topRoutes(prices []price, n int) []route {
+	var routes []route
+	for _, name := range commodityNames(prices) {
+		buy := best(prices, func(p price) bool { return p.Commodity == name && p.Buy > 0 && p.Stock > 0 }, cheaper)
+		sell := best(prices, func(p price) bool { return p.Commodity == name && p.Sell > 0 }, pricier)
+		if buy != nil && sell != nil && sell.Sell > buy.Buy {
+			routes = append(routes, route{*buy, *sell})
+		}
+	}
+	slices.SortFunc(routes, func(a, b route) int { return cmp.Compare(b.margin(), a.margin()) })
+	return routes[:min(n, len(routes))]
+}

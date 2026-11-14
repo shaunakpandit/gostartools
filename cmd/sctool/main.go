@@ -17,6 +17,7 @@ type searchKind string
 const (
 	commoditySearch searchKind = "commodity"
 	locationSearch  searchKind = "location"
+	topView         searchKind = "top"
 )
 
 type loadedMsg struct {
@@ -44,7 +45,7 @@ func search(kind searchKind, query string) tea.Cmd {
 	}
 }
 
-func (m model) Init() tea.Cmd { return search("", "") }
+func (m model) Init() tea.Cmd { return search(topView, "") }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -59,7 +60,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.data = msg.data
 		}
 		m.err = msg.err
-		if msg.query != "" {
+		if msg.query != "" || msg.kind == topView {
 			m.view.SetContent(render(m.data, msg.kind, msg.query))
 			m.view.GotoTop()
 		}
@@ -121,6 +122,8 @@ func (m model) updateNormal(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.pendingG = true
 		}
+	case "t":
+		return m, search(topView, "")
 	case "?":
 		m.view.SetContent(help())
 	}
@@ -136,7 +139,7 @@ func (m model) View() string {
 	if m.inserting {
 		return m.view.View() + "\n" + badge.Foreground(lipgloss.Color("2")).Render(string(m.kind)) + " " + m.input.View()
 	}
-	status := faint.Render("  c commodity  l location  ? help  q quit")
+	status := faint.Render("  t top  c commodity  l location  ? help  q quit")
 	if !m.data.FetchedAt.IsZero() {
 		status = faint.Render("  "+m.data.FetchedAt.Format(time.TimeOnly)) + status
 	}
@@ -148,6 +151,7 @@ func (m model) View() string {
 
 func help() string {
 	keys := [][2]string{
+		{"t", "top margins (landing page)"},
 		{"c", "search a commodity (fuzzy, e.g. quant)"},
 		{"l", "search a location (fuzzy, e.g. new babbage)"},
 		{"/", "search again in the current mode"},
