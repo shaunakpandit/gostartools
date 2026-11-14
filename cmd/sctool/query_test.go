@@ -2,6 +2,7 @@ package main
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -66,5 +67,19 @@ func TestTopRoutes(t *testing.T) {
 	// Gold: in-stock Beta 90 -> Delta 150; the cheaper Empty terminal has no stock. Iodine has no buyer.
 	if len(routes) != 1 || routes[0].Buy.Terminal != "Beta" || routes[0].Sell.Terminal != "Delta" || routes[0].margin() != 60 {
 		t.Fatalf("routes = %+v", routes)
+	}
+}
+
+func TestRenderCommodityMarginsFromCheapestBuy(t *testing.T) {
+	// Gold buys only in Stanton (Beta 90, in stock); Pyro's Delta 150 must still get a margin and sort first.
+	out := renderCommodity(fixture, "Gold")
+	pyro, stanton := strings.Index(out, "Pyro"), strings.Index(out, "Stanton  ")
+	if pyro < 0 || stanton < 0 || pyro > stanton {
+		t.Fatalf("Pyro should be listed before Stanton:\n%s", out)
+	}
+	for _, want := range []string{"+60", "+30", "Beta Stanton 90/SCU"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
 	}
 }

@@ -53,17 +53,31 @@ func render(data snapshot, kind searchKind, query string) string {
 	return strings.Join(sections, "\n\n")
 }
 
+// renderCommodity measures every system's best sell against the single cheapest in-stock buy anywhere,
+// so sell locations in systems with no buy point still get a margin. Sorting by sell price is sorting by margin.
 func renderCommodity(prices []price, name string) string {
 	lines := commodityReport(prices, name)
-	margins := make([]float64, len(lines))
-	for index, line := range lines {
-		if line.Buy != nil && line.Sell != nil {
-			margins[index] = line.Sell.Sell - line.Buy.Buy
+	source, _ := bestRoute(prices, name)
+	margin := func(line systemLine) float64 {
+		if source == nil || line.Sell == nil {
+			return math.Inf(-1)
 		}
+		return line.Sell.Sell - source.Buy
 	}
-	best := maxOf(margins)
+	sellPrice := func(line systemLine) float64 {
+		if line.Sell == nil {
+			return -1
+		}
+		return line.Sell.Sell
+	}
+	slices.SortStableFunc(lines, func(a, b systemLine) int { return cmp.Compare(sellPrice(b), sellPrice(a)) })
+	detail := "no in-stock buy anywhere"
+	if source != nil {
+		detail = fmt.Sprintf("margins from cheapest buy: %s %s %s/SCU", source.Terminal, source.System, money(source.Buy))
+	}
+	best := max(0, margin(lines[0]))
 	var rows [][]string
-	for index, line := range lines {
+	for _, line := range lines {
 		row := []string{bold.Render(line.System)}
 		if line.Buy != nil {
 			row = append(row, place.Render(truncate(line.Buy.Terminal, nameWidth)), cost.Render(money(line.Buy.Buy)), stock(line.Buy.Stock))
@@ -75,15 +89,15 @@ func renderCommodity(prices []price, name string) string {
 		} else {
 			row = append(row, faint.Render(none), "")
 		}
-		if line.Buy != nil && line.Sell != nil {
-			row = append(row, signed(margins[index]), bar(margins[index], best))
+		if source != nil && line.Sell != nil {
+			row = append(row, signed(margin(line)), bar(margin(line), best))
 		} else {
 			row = append(row, "", "")
 		}
 		rows = append(rows, row)
 	}
-	columns := []column{{"system", false}, {"buy at", false}, {"aUEC", true}, {"scu", true}, {"sell at", false}, {"aUEC", true}, {"margin", true}, {"", false}}
-	return heading(name, fmt.Sprintf("%d systems", len(lines))) + "\n" + layout(columns, rows)
+	columns := []column{{"system", false}, {"cheapest buy", false}, {"aUEC", true}, {"scu", true}, {"best sell", false}, {"aUEC", true}, {"margin", true}, {"", false}}
+	return heading(name, detail) + "\n" + layout(columns, rows)
 }
 
 func renderLocation(prices []price, t terminal) string {
@@ -247,14 +261,6 @@ func truncate(text string, width int) string {
 		return text
 	}
 	return string(runes[:width-1]) + "…"
-}
-
-func maxOf(values []float64) float64 {
-	result := 0.0
-	for _, value := range values {
-		result = max(result, value)
-	}
-	return result
 }
 
 func nonEmpty(values ...string) []string {
