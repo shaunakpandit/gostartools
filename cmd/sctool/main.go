@@ -36,6 +36,9 @@ type model struct {
 	err       error
 	pendingG  bool
 	ready     bool
+	showing   searchKind
+	routes    []route
+	cursor    int
 }
 
 func search(kind searchKind, query string) tea.Cmd {
@@ -60,7 +63,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.data = msg.data
 		}
 		m.err = msg.err
-		if msg.query != "" || msg.kind == topView {
+		switch {
+		case msg.kind == topView:
+			m.showing, m.routes = topView, topRoutes(m.data.Prices, topCount)
+			m.view.GotoTop()
+			m.moveCursor(m.cursor)
+		case msg.query != "":
+			m.showing = msg.kind
 			m.view.SetContent(render(m.data, msg.kind, msg.query))
 			m.view.GotoTop()
 		}
@@ -91,21 +100,51 @@ func (m model) updateInsert(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, command
 }
 
+// moveCursor clamps the top-list selection, re-renders, and scrolls so the selected row stays visible.
+func (m *model) moveCursor(to int) {
+	m.cursor = max(0, min(to, len(m.routes)-1))
+	m.view.SetContent(renderTop(m.routes, m.cursor))
+	line := m.cursor + topHeaderLines
+	if m.cursor == 0 {
+		m.view.GotoTop()
+	} else if line < m.view.YOffset {
+		m.view.SetYOffset(line)
+	} else if line >= m.view.YOffset+m.view.Height {
+		m.view.SetYOffset(line - m.view.Height + 1)
+	}
+}
+
 func (m model) updateNormal(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 	wasPendingG := m.pendingG
 	m.pendingG = false
-	switch key.String() {
-	case "q", "ctrl+c":
-		return m, tea.Quit
-	case "c", "l", "/":
-		if key.String() == "c" {
+	if m.showing == topView && len(m.routes) > 0 {
+		half := max(1, m.view.Height/2)
+		switch key.String() {
+		case "j", "down":
+			m.moveCursor(m.cursor + 1)
+		case "k", "up":
+			m.moveCursor(m.cursor - 1)
+		case "ctrl+d":
+			m.moveCursor(m.cursor + half)
+		case "ctrl+u":
+			m.moveCursor(m.cursor - half)
+		case "G":
+			m.moveCursor(len(m.routes) - 1)
+		case "g":
+			if wasPendingG {
+				m.moveCursor(0)
+			} else {
+				m.pendingG = true
+			}
+		case "enter":
 			m.kind = commoditySearch
-		} else if key.String() == "l" {
-			m.kind = locationSearch
+			return m, search(commoditySearch, m.routes[m.cursor].Buy.Commodity)
+		default:
+			return m.updateCommon(key)
 		}
-		m.inserting = true
-		m.input.SetValue("")
-		return m, m.input.Focus()
+		return m, nil
+	}
+	switch key.String() {
 	case "j", "down":
 		m.view.ScrollDown(1)
 	case "k", "up":
@@ -122,9 +161,29 @@ func (m model) updateNormal(key tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.pendingG = true
 		}
+	default:
+		return m.updateCommon(key)
+	}
+	return m, nil
+}
+
+func (m model) updateCommon(key tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch key.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "c", "l", "/":
+		if key.String() == "c" {
+			m.kind = commoditySearch
+		} else if key.String() == "l" {
+			m.kind = locationSearch
+		}
+		m.inserting = true
+		m.input.SetValue("")
+		return m, m.input.Focus()
 	case "t":
 		return m, search(topView, "")
 	case "?":
+		m.showing = ""
 		m.view.SetContent(help())
 	}
 	return m, nil
@@ -151,7 +210,7 @@ func (m model) View() string {
 
 func help() string {
 	keys := [][2]string{
-		{"t", "top margins (landing page)"},
+		{"t", "top margins (landing page); j/k select, enter opens the commodity"},
 		{"c", "search a commodity (fuzzy, e.g. quant)"},
 		{"l", "search a location (fuzzy, e.g. new babbage)"},
 		{"/", "search again in the current mode"},

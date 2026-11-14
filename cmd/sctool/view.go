@@ -36,9 +36,6 @@ type column struct {
 
 func render(data snapshot, kind searchKind, query string) string {
 	var sections []string
-	if kind == topView {
-		return renderTop(data.Prices)
-	}
 	if kind == commoditySearch {
 		identity := func(name string) []string { return []string{name} }
 		for _, name := range topMatches(query, commodityNames(data.Prices), identity, 3) {
@@ -118,8 +115,10 @@ func renderLocation(prices []price, t terminal) string {
 	return title + "\n" + layout(columns, rows)
 }
 
-func renderTop(prices []price) string {
-	routes := topRoutes(prices, topCount)
+// topHeaderLines is how many lines renderTop prints above the first route.
+const topHeaderLines = 2
+
+func renderTop(routes []route, selected int) string {
 	title := heading("Top margins", "cheapest in-stock buy → best sell anywhere · aUEC per SCU")
 	if len(routes) == 0 {
 		return title + "\n" + faint.Render("  no profitable routes in the current data")
@@ -131,9 +130,13 @@ func renderTop(prices []price) string {
 		best = max(best, roi(r))
 	}
 	var rows [][]string
-	for _, r := range routes {
+	for index, r := range routes {
+		marker, name := " ", bold.Render(r.Buy.Commodity)
+		if index == selected {
+			marker, name = accent.Render("❯"), accent.Render(r.Buy.Commodity)
+		}
 		rows = append(rows, []string{
-			bold.Render(r.Buy.Commodity),
+			marker + " " + name,
 			place.Render(truncate(r.Buy.Terminal, nameWidth)) + faint.Render(" "+r.Buy.System),
 			cost.Render(money(r.Buy.Buy)),
 			stock(r.Buy.Stock),
@@ -145,7 +148,7 @@ func renderTop(prices []price) string {
 		})
 	}
 	columns := []column{
-		{"commodity", false}, {"buy at", false}, {"aUEC", true}, {"scu", true},
+		{"  commodity", false}, {"buy at", false}, {"aUEC", true}, {"scu", true},
 		{"sell at", false}, {"aUEC", true}, {"margin", true}, {"roi", true}, {"", false},
 	}
 	return title + "\n" + layout(columns, rows)

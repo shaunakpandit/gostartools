@@ -21,7 +21,7 @@ Each directory under `cmd/` is one binary, named after its directory.
 
 ## sctool
 
-Run `sctool`. It opens on the **top margins** view: the 25 commodities with the biggest profit per SCU, each going from its cheapest in-stock buy to its best sell anywhere, with ROI bars. Press `t` to come back to it at any time.
+Run `sctool`. It opens on the **top margins** view: the 25 commodities with the biggest profit per SCU, each going from its cheapest in-stock buy to its best sell anywhere, with ROI bars. Use `j`/`k` (or `gg`/`G`, `ctrl-d`/`ctrl-u`) to move the selection, and `enter` to open the selected commodity as a commodity search. Press `t` to come back; the selection is kept.
 
 | Key | Action |
 |---|---|
